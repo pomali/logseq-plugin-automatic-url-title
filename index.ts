@@ -193,8 +193,11 @@ const main = async () => {
         extLinksObserver.observe(appContainer, extLinksObserverConfig);
     }, 500);
 
-    logseq.Editor.registerBlockContextMenuItem('Format url titles', async ({ uuid }) => {
-        await parseBlockForLink(uuid);
+    logseq.App.registerCommandPalette(
+            { key: 'format-url-titles', label: 'Format url titles' }, async (e) => {
+        const selected = (await logseq.Editor.getSelectedBlocks()) ?? [];
+        selected.forEach((block) => parseBlockForLink(block.uuid));
+
         const extLinkList: NodeListOf<HTMLAnchorElement> = doc.querySelectorAll('.external-link');
         extLinkList.forEach(setFavicon);
     });
