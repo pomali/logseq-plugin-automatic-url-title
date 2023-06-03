@@ -189,25 +189,25 @@ const main = async () => {
     });
 
     setTimeout(() => {
-        doc.querySelectorAll('.external-link')?.forEach(extLink => setFavicon(extLink));
+        doc.querySelectorAll('.external-link')?.forEach(setFavicon);
         extLinksObserver.observe(appContainer, extLinksObserverConfig);
     }, 500);
 
     logseq.Editor.registerBlockContextMenuItem('Format url titles', async ({ uuid }) => {
         await parseBlockForLink(uuid);
         const extLinkList: NodeListOf<HTMLAnchorElement> = doc.querySelectorAll('.external-link');
-        extLinkList.forEach(extLink => setFavicon(extLink));
+        extLinkList.forEach(setFavicon);
     });
 
     const blockSet = new Set();
     logseq.DB.onChanged(async (e) => {
         if (e.txMeta?.outlinerOp !== 'insertBlocks') {
             blockSet.add(e.blocks[0]?.uuid);
-            doc.querySelectorAll('.external-link')?.forEach(extLink => setFavicon(extLink));
+            doc.querySelectorAll('.external-link')?.forEach(setFavicon);
             return;
         }
 
-        await blockSet.forEach((uuid) => parseBlockForLink(uuid as string));
+        blockSet.forEach(parseBlockForLink);
         blockSet.clear();
     });
 };
