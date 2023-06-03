@@ -170,15 +170,13 @@ const main = async () => {
             selected.forEach((block) => parseBlockForLink(block.uuid));
     });
 
-    const blockSet = new Set();
     logseq.DB.onChanged(async (e) => {
-        if (e.txMeta?.outlinerOp !== 'insertBlocks') {
-            blockSet.add(e.blocks[0]?.uuid);
-            return;
+        if (e.txMeta?.outlinerOp === 'insertBlocks') {
+            for (const block of e.blocks ?? [])
+                if (!block.name)  // is not a page
+                    if (block.left.id === block.parent.id && !block.content)  // is new block
+                        parseBlockForLink(block.parent.id)
         }
-
-        blockSet.forEach(parseBlockForLink);
-        blockSet.clear();
     });
 };
 
