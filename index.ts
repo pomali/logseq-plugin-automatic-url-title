@@ -126,7 +126,7 @@ async function getFormatSettings() {
     return FORMAT_SETTINGS[preferredFormat];
 }
 
-async function parseBlockForLink(uuid: string) {
+async function parseBlockForLink(uuid) {
     if (!uuid) {
         return;
     }
@@ -160,84 +160,20 @@ async function parseBlockForLink(uuid: string) {
         offset = updatedTitle.offset;
     }
 
-    await logseq.Editor.updateBlock(uuid, text);
+    await logseq.Editor.updateBlock(rawBlock.uuid, text);
 }
 
 const main = async () => {
-    logseq.provideStyle(`
-    .external-link {
-        padding: 2px 4px;
-        border-radius: 3px;
-        border: 0;
-        text-decoration: underline;
-        text-decoration-style: dashed;
-        text-decoration-thickness: 1px;
-        text-underline-offset: 2px;
-    }
-    .external-link-img {
-        display: var(--favicons, inline-block);
-        width: 16px;
-        height: 16px;
-        margin: -3px 7px 0 0;
-    }`);
-
-    const doc = parent.document;
-    const appContainer = doc.getElementById('app-container');
-
-    // External links favicons
-    const setFavicon = (extLinkEl: HTMLAnchorElement) => {
-        const oldFav = extLinkEl.querySelector('.external-link-img');
-        if (oldFav) {
-            oldFav.remove();
-        }
-        const { hostname } = new URL(extLinkEl.href);
-        const faviconValue = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
-        const fav = doc.createElement('img');
-        fav.src = faviconValue;
-        fav.width = 16;
-        fav.height = 16;
-        fav.classList.add('external-link-img');
-        extLinkEl.insertAdjacentElement('afterbegin', fav);
-    };
-
-    // Favicons observer
-    const extLinksObserverConfig = { childList: true, subtree: true };
-    const extLinksObserver = new MutationObserver((mutationsList, observer) => {
-        for (let i = 0; i < mutationsList.length; i++) {
-            const addedNode = mutationsList[i].addedNodes[0];
-            if (addedNode && addedNode.childNodes.length) {
-                const extLinkList = addedNode.querySelectorAll('.external-link');
-                if (extLinkList.length) {
-                    extLinksObserver.disconnect();
-                    for (let i = 0; i < extLinkList.length; i++) {
-                        setFavicon(extLinkList[i]);
-                    }
-
-                    extLinksObserver.observe(appContainer, extLinksObserverConfig);
-                }
-            }
-        }
-    });
-
-    setTimeout(() => {
-        doc.querySelectorAll('.external-link')?.forEach(setFavicon);
-        extLinksObserver.observe(appContainer, extLinksObserverConfig);
-    }, 500);
-
     logseq.App.registerCommandPalette(
-            { key: 'format-url-titles', label: 'Format url titles' }, async (e) => {
-        const selected = (await logseq.Editor.getSelectedBlocks()) ?? [];
-        selected.forEach((block) => parseBlockForLink(block.uuid));
-
-        const extLinkList: NodeListOf<HTMLAnchorElement> = doc.querySelectorAll('.external-link');
-        extLinkList.forEach(setFavicon);
+        { key: 'format-url-titles', label: 'Format url titles' }, async (e) => {
+            const selected = (await logseq.Editor.getSelectedBlocks()) ?? [];
+            selected.forEach((block) => parseBlockForLink(block.uuid));
     });
 
     const blockSet = new Set();
     logseq.DB.onChanged(async (e) => {
         if (e.txMeta?.outlinerOp !== 'insertBlocks') {
             blockSet.add(e.blocks[0]?.uuid);
-            doc.querySelectorAll('.external-link')?.forEach(setFavicon);
             return;
         }
 
