@@ -4,3 +4,4 @@ dist
 *.local
 .parcel-cache
 .idea
+*.sublime-*
