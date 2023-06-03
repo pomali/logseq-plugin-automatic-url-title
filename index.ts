@@ -41,6 +41,29 @@ async function getTitle(url) {
         console.error(e);
     }
 
+    /**
+     * Special case for reddit.com
+     *
+     * url: https://www.reddit.com/r/logseq/comments/13yeg3i/noob_question_how_to_approach_daily_journal_notes/
+     * api: https://www.reddit.com//api/info.json?id=t3_13yeg3i
+     */
+    const redditMatch = url.match(/reddit.com\/r\/[^/]+\/comments\/([^/]+)/)
+    if (redditMatch && redditMatch.length) {
+        const id = redditMatch[1];
+        const api = `https://www.reddit.com/api/info.json?id=t3_${id}`
+        try {
+            const response = await fetch(api);
+            const data = await response.json();
+            const post = data?.data?.children[0]?.data ?? {};
+            if (post.title) {
+                if (post.subreddit_name_prefixed)
+                    return `${post.subreddit_name_prefixed} — ${post.title}`
+                return post.title
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
     for (const titleRegexp of titleRegexps) {
         const matches = content.match(titleRegexp);
