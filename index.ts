@@ -3,10 +3,14 @@ import '@logseq/libs';
 const DEFAULT_REGEX = {
     wrappedInCommand: /(\{\{\s*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})\s*\}\})/gi,
     wrappedInCodeTags: /((`|```).*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,}).*(`|```))/gi,
-    htmlTitleTag: /<title(\s[^>]+)*>([^<]*)<\/title>/,
     line: /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\)\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\)\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\)\s]{2,}|www\.[a-zA-Z0-9]+\.[^\)\s]{2,})/gi,
     imageExtension: /\.(gif|jpe?g|tiff?|png|webp|bmp|tga|psd|ai)$/i,
 };
+
+const titleRegexps = [
+    /<meta\sproperty="twitter:title"\scontent="([^"]*)/i,
+    /<title\s?[^>]*>([^<]*)<\/title>/i,
+]
 
 const FORMAT_SETTINGS = {
     markdown: {
@@ -29,15 +33,19 @@ function decodeHTML(input) {
 }
 
 async function getTitle(url) {
+    let content = ''
     try {
         const response = await fetch(url);
-        const responseText = await response.text();
-        const matches = responseText.match(DEFAULT_REGEX.htmlTitleTag);
-        if (matches !== null && matches.length > 1 && matches[2] !== null) {
-            return decodeHTML(matches[2].trim());
-        }
+        content = await response.text();
     } catch (e) {
         console.error(e);
+    }
+
+
+    for (const titleRegexp of titleRegexps) {
+        const matches = content.match(titleRegexp);
+        if (matches && matches.length)
+            return decodeHTML(matches[1].trim());
     }
 
     return '';
