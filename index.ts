@@ -174,8 +174,8 @@ const main = async () => {
         if (e.txMeta?.outlinerOp === 'insertBlocks') {
             for (const block of e.blocks ?? [])
                 if (!block.name)  // is not a page
-                    if (block.left.id === block.parent.id && !block.content)  // is new block
-                        parseBlockForLink(block.parent.id)
+                    if (!block.content)  // is new block
+                        parseBlockForLink(block.left.id)
         }
     });
 };
