@@ -175,7 +175,8 @@ const main = async () => {
             for (const block of e.blocks ?? [])
                 if (!block.name)  // is not a page
                     if (!block.content)  // is new block
-                        parseBlockForLink(block.left.id)
+                        if (block.left.id)
+                            parseBlockForLink(block.left.id)
         }
     });
 };
