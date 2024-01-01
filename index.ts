@@ -171,7 +171,7 @@ const main = async () => {
     });
 
     logseq.DB.onChanged(async (e) => {
-        if (e.txMeta?.outlinerOp === 'insertBlocks') {
+        if (e.txMeta?.outlinerOp === 'insert-blocks') {
             for (const block of e.blocks ?? [])
                 if (!block.name)  // is not a page
                     if (!block.content)  // is new block

@@ -8,6 +8,7 @@
     "license": "MIT",
     "logseq": {
         "id": "_logseq-plugin-automatic-url-title",
+        "title": "Automatic URL Title",
         "icon": "./icon.png"
     },
     "targets": {
