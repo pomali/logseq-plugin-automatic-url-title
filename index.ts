@@ -1,8 +1,10 @@
 import '@logseq/libs';
 
 const DEFAULT_REGEX = {
-    wrappedInCommand: /(\{\{\s*\w*\s*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})\s*\w*\s*\}\})/gi,
-    wrappedInCodeTags: /((`|```).*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,}).*(`|```))/gi,
+    wrappedInCommand:
+        /(\{\{\s*\w*\s*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})\s*\w*\s*\}\})/gi,
+    wrappedInCodeTags:
+        /((`|```).*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,}).*(`|```))/gi,
     line: /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\)\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\)\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\)\s]{2,}|www\.[a-zA-Z0-9]+\.[^\)\s]{2,})/gi,
     htmlTitleTag: /<title(\s[^>]+)*>([^<]*)<\/title>/,
     imageExtension: /\.(gif|jpe?g|tiff?|png|webp|bmp|tga|psd|ai)$/i,
@@ -11,16 +13,16 @@ const DEFAULT_REGEX = {
 const titleRegexps = [
     /<meta\sproperty="twitter:title"\scontent="([^"]*)/i,
     /<title\s?[^>]*>([^<]*)<\/title>/i,
-]
+];
 
 const FORMAT_SETTINGS = {
     markdown: {
         formatBeginning: '](',
-        applyFormat: (title, url) => `[${title}](${url})`,
+        applyFormat: (title: string, url: string) => `[${title}](${url})`,
     },
     org: {
         formatBeginning: '][',
-        applyFormat: (title, url) => `[[${url}][${title}]]`,
+        applyFormat: (title: string, url: string) => `[[${url}][${title}]]`,
     },
 };
 
@@ -34,7 +36,7 @@ function decodeHTML(input) {
 }
 
 async function getTitle(url) {
-    let content = ''
+    let content = '';
     try {
         const response = await fetch(url);
         content = await response.text();
@@ -48,18 +50,18 @@ async function getTitle(url) {
      * url: https://www.reddit.com/r/logseq/comments/13yeg3i/noob_question_how_to_approach_daily_journal_notes/
      * api: https://www.reddit.com//api/info.json?id=t3_13yeg3i
      */
-    const redditMatch = url.match(/reddit.com\/r\/[^/]+\/comments\/([^/]+)/)
+    const redditMatch = url.match(/reddit.com\/r\/[^/]+\/comments\/([^/]+)/);
     if (redditMatch && redditMatch.length) {
         const id = redditMatch[1];
-        const api = `https://www.reddit.com/api/info.json?id=t3_${id}`
+        const api = `https://www.reddit.com/api/info.json?id=t3_${id}`;
         try {
             const response = await fetch(api);
             const data = await response.json();
             const post = data?.data?.children[0]?.data ?? {};
             if (post.title) {
                 if (post.subreddit_name_prefixed)
-                    return `${post.subreddit_name_prefixed} — ${post.title}`
-                return post.title
+                    return `${post.subreddit_name_prefixed} — ${post.title}`;
+                return post.title;
             }
         } catch (e) {
             console.error(e);
@@ -68,14 +70,19 @@ async function getTitle(url) {
 
     for (const titleRegexp of titleRegexps) {
         const matches = content.match(titleRegexp);
-        if (matches && matches.length)
-            return decodeHTML(matches[1].trim());
+        if (matches && matches.length) return decodeHTML(matches[1].trim());
     }
 
     return '';
 }
 
-async function convertUrlToMarkdownLink(url, text, urlStartIndex, offset, applyFormat) {
+async function convertUrlToMarkdownLink(
+    url,
+    text,
+    urlStartIndex,
+    offset,
+    applyFormat
+) {
     const title = await getTitle(url);
     if (title === '') {
         return { text, offset };
@@ -106,7 +113,7 @@ function isWrappedInCommand(text, url) {
         return false;
     }
 
-    return wrappedLinks.some(command => command.includes(url));
+    return wrappedLinks.some((command) => command.includes(url));
 }
 
 function isWrappedInCodeTags(text, url) {
@@ -115,7 +122,7 @@ function isWrappedInCodeTags(text, url) {
         return false;
     }
 
-    return wrappedLinks.some(command => command.includes(url));
+    return wrappedLinks.some((command) => command.includes(url));
 }
 
 async function getFormatSettings() {
@@ -152,11 +159,27 @@ async function parseBlockForLink(uuid) {
     for (const url of urls) {
         const urlIndex = text.indexOf(url, offset);
 
-        if (isAlreadyFormatted(text, url, urlIndex, formatSettings.formatBeginning) || isImage(url) || isWrappedInCommand(text, url) || isWrappedInCodeTags(text, url)) {
+        if (
+            isAlreadyFormatted(
+                text,
+                url,
+                urlIndex,
+                formatSettings.formatBeginning
+            ) ||
+            isImage(url) ||
+            isWrappedInCommand(text, url) ||
+            isWrappedInCodeTags(text, url)
+        ) {
             continue;
         }
 
-        const updatedTitle = await convertUrlToMarkdownLink(url, text, urlIndex, offset, formatSettings.applyFormat);
+        const updatedTitle = await convertUrlToMarkdownLink(
+            url,
+            text,
+            urlIndex,
+            offset,
+            formatSettings.applyFormat
+        );
         text = updatedTitle.text;
         offset = updatedTitle.offset;
     }
@@ -166,18 +189,22 @@ async function parseBlockForLink(uuid) {
 
 const main = async () => {
     logseq.App.registerCommandPalette(
-        { key: 'format-url-titles', label: 'Format url titles' }, async (e) => {
+        { key: 'format-url-titles', label: 'Format url titles' },
+        async (e) => {
             const selected = (await logseq.Editor.getSelectedBlocks()) ?? [];
             selected.forEach((block) => parseBlockForLink(block.uuid));
-    });
+        }
+    );
 
     logseq.DB.onChanged(async (e) => {
         if (e.txMeta?.outlinerOp === 'insert-blocks') {
             for (const block of e.blocks ?? [])
-                if (!block.name)  // is not a page
-                    if (!block.content)  // is new block
+                if (!block.name)
+                    if (!block.content)
+                        // is not a page
                         if (block.left)
-                            parseBlockForLink(block.left.id)
+                            // is new block
+                            parseBlockForLink(block.left.id);
         }
     });
 };
