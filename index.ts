@@ -1,8 +1,10 @@
 import '@logseq/libs';
+import { BlockEntity } from '@logseq/libs/dist/LSPlugin.user';
 
 const DEFAULT_REGEX = {
     wrappedInCommand:
         /(\{\{\s*\w*\s*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})\s*\w*\s*\}\})/gi,
+    command: /\{\{\s*(\w*)\s*/i,
     wrappedInCodeTags:
         /((`|```).*(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,}).*(`|```))/gi,
     line: /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\)\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\)\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\)\s]{2,}|www\.[a-zA-Z0-9]+\.[^\)\s]{2,})/gi,
@@ -77,25 +79,43 @@ async function getTitle(url) {
 }
 
 async function convertUrlToMarkdownLink(
-    url,
-    text,
-    urlStartIndex,
-    offset,
-    applyFormat
+    url: string,
+    text: string,
+    urlStartIndex: number,
+    offset: number,
+    applyFormat: (title: string, url: string) => string
 ) {
     const title = await getTitle(url);
     if (title === '') {
         return { text, offset };
     }
 
-    const startSection = text.slice(0, urlStartIndex);
     const wrappedUrl = applyFormat(title, url);
+    const startSection = text.slice(0, urlStartIndex);
     const endSection = text.slice(urlStartIndex + url.length);
 
     return {
         text: `${startSection}${wrappedUrl}${endSection}`,
         offset: urlStartIndex + url.length,
     };
+}
+
+async function convertUrlToChildBlock(
+    url: string,
+    rawBlock: BlockEntity,
+    formatSettings: { formatBeginning?: string; applyFormat: any }
+) {
+    const title = await getTitle(url);
+    if (title === '') {
+        return;
+    }
+
+    const wrappedUrl = formatSettings.applyFormat(title, url);
+    await logseq.Editor.insertBlock(rawBlock.uuid, wrappedUrl, {
+        before: false,
+        sibling: false,
+        focus: true,
+    });
 }
 
 function isImage(url) {
@@ -107,13 +127,17 @@ function isAlreadyFormatted(text, url, urlIndex, formatBeginning) {
     return text.slice(urlIndex - 2, urlIndex) === formatBeginning;
 }
 
-function isWrappedInCommand(text, url) {
+function isWrappedInCommand(text: string, url: string) {
     const wrappedLinks = text.match(DEFAULT_REGEX.wrappedInCommand);
     if (!wrappedLinks) {
         return false;
     }
-
     return wrappedLinks.some((command) => command.includes(url));
+}
+
+function isVideoCommand(text: string) {
+    const command = text.match(DEFAULT_REGEX.command);
+    return command && command[1] === 'video';
 }
 
 function isWrappedInCodeTags(text, url) {
@@ -145,8 +169,8 @@ async function parseBlockForLink(uuid) {
     }
 
     let text = rawBlock.content;
-    const urls = text.match(DEFAULT_REGEX.line);
-    if (!urls) {
+    const results = text.matchAll(DEFAULT_REGEX.line);
+    if (!results) {
         return;
     }
 
@@ -156,8 +180,13 @@ async function parseBlockForLink(uuid) {
     }
 
     let offset = 0;
-    for (const url of urls) {
-        const urlIndex = text.indexOf(url, offset);
+    for (const result of results) {
+        let url = result[0];
+        const urlIndex = result.index;
+
+        if (urlIndex === undefined) {
+            continue;
+        }
 
         if (
             isAlreadyFormatted(
@@ -165,12 +194,52 @@ async function parseBlockForLink(uuid) {
                 url,
                 urlIndex,
                 formatSettings.formatBeginning
-            ) ||
-            isImage(url) ||
-            isWrappedInCommand(text, url) ||
-            isWrappedInCodeTags(text, url)
+            )
         ) {
             continue;
+        }
+
+        if (isImage(url)) {
+            continue;
+        }
+
+        if (isWrappedInCodeTags(text, url)) {
+            continue;
+        }
+
+        if (isWrappedInCommand(text, url)) {
+            if (!isVideoCommand(text)) {
+                continue;
+            } else {
+                // fix for video command and trailing `}}`
+                if (url.endsWith('}}')) {
+                    url = url.slice(0, -2);
+                    if (
+                        isAlreadyFormatted(
+                            text,
+                            url,
+                            urlIndex,
+                            formatSettings.formatBeginning
+                        )
+                    ) {
+                        continue;
+                    }
+                }
+                const childBlockUuid = rawBlock?.children?.[0]?.[1];
+                if (!childBlockUuid) {
+                    convertUrlToChildBlock(url, rawBlock, formatSettings);
+                    continue;
+                }
+
+                const childBlock = await logseq.Editor.getBlock(
+                    childBlockUuid[0]
+                );
+                if (!childBlock || !childBlock.content.match(url)) {
+                    convertUrlToChildBlock(url, rawBlock, formatSettings);
+                }
+
+                continue;
+            }
         }
 
         const updatedTitle = await convertUrlToMarkdownLink(
@@ -188,23 +257,33 @@ async function parseBlockForLink(uuid) {
 }
 
 const main = async () => {
-    logseq.App.registerCommandPalette(
-        { key: 'format-url-titles', label: 'Format url titles' },
-        async (e) => {
-            const selected = (await logseq.Editor.getSelectedBlocks()) ?? [];
-            selected.forEach((block) => parseBlockForLink(block.uuid));
-        }
-    );
+    try {
+        logseq.App.registerCommandPalette(
+            { key: 'format-url-titles', label: 'Format url titles' },
+            async (e) => {
+                const selected =
+                    (await logseq.Editor.getSelectedBlocks()) ?? [];
+                selected.forEach((block) => parseBlockForLink(block.uuid));
+            }
+        );
+    } catch (e) {
+        console.log('Error registering command palette');
+        console.error(e);
+    }
 
     logseq.DB.onChanged(async (e) => {
         if (e.txMeta?.outlinerOp === 'insert-blocks') {
-            for (const block of e.blocks ?? [])
-                if (!block.name)
-                    if (!block.content)
+            for (const block of e.blocks ?? []) {
+                if (!block.name) {
+                    if (!block.content) {
                         // is not a page
-                        if (block.left)
+                        if (block.left) {
                             // is new block
                             parseBlockForLink(block.left.id);
+                        }
+                    }
+                }
+            }
         }
     });
 };
